@@ -1,0 +1,85 @@
+.pageWrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #fff;
+  font-family: 'Poppins', sans-serif;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.closeButton { color: #888; }
+.sproutIcon { color: #5D9275; }
+
+.progressBarContainer {
+  flex-grow: 1;
+  margin: 0 1rem;
+}
+
+.progressBarTrack {
+  height: 4px;
+  background-color: #e0e0e0;
+  border-radius: 2px;
+}
+
+.progressBar {
+  height: 100%;
+  background-color: #5D9275;
+  border-radius: 2px;
+}
+
+.main {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1rem;
+}
+
+.container { max-width: 400px; margin: 0 auto; }
+
+.logoContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+  color: #5D9275;
+}
+
+.logoIcon { margin-right: 0.5rem; }
+
+.logoText {
+  font-size: 2.5rem;
+  font-weight: 600;
+  font-family: 'Georgia', serif;
+}
+
+.subText {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 2.5rem;
+  line-height: 1.6;
+}
+
+.downloadButton {
+  display: inline-block;
+  background-color: #5D9275;
+  color: white;
+  font-weight: 600;
+  padding: 1rem 2.5rem;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.downloadButton:hover { opacity: 0.9; }
