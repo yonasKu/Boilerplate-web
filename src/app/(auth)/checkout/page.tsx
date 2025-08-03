@@ -1,13 +1,36 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { X, Sprout, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useSubscription } from '@/hooks/useSubscription';
 import styles from './page.module.css';
 
 export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState('apple');
+  const searchParams = useSearchParams();
+  const plan = searchParams.get('plan') || 'annual';
+
+  const { user, loading } = useSubscription();
+
+  const planDetails = {
+    monthly: {
+      price: '$4.99/month',
+      name: 'Monthly Plan',
+    },
+    annual: {
+      price: '$44.99/year',
+      name: 'Annual Plan',
+    },
+  };
+
+  const selectedPlanDetails = plan === 'monthly' ? planDetails.monthly : planDetails.annual;
+
+  if (loading) {
+    return <div className={styles.loading}>Loading...</div>;
+  }
 
   return (
     <div className={styles.pageWrapper}>
@@ -17,9 +40,9 @@ export default function CheckoutPage() {
         <div className={styles.container}>
           <div className={styles.planInfo}>
             <Image src="/assets/Logo_text_small.png" alt="Sproutbook Logo" width={140} height={40} className={styles.mainSproutIcon} />
-            <p className={styles.trialText}>10 days free, then</p>
-            <p className={styles.priceText}>$4.99/month</p>
-            <div className={styles.planBadge}>Monthly Plan</div>
+            <p className={styles.trialText}>7 days free, then</p>
+            <p className={styles.priceText}>{selectedPlanDetails.price}</p>
+            <div className={styles.planBadge}>{selectedPlanDetails.name}</div>
           </div>
 
           <p className={styles.paymentTitle}>Payment Option</p>

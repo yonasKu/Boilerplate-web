@@ -134,4 +134,15 @@
 }
 
 .termsText { font-size: 0.8rem; color: #666; line-height: 1.5; }
-.termsText a { color: #5D9275; text-decoration: underline; }
+.termsText a:hover {
+  text-decoration: underline;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: 1.25rem;
+  color: #6b7280;
+}
