@@ -2,13 +2,28 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import PrimaryButton from '@/components/PrimaryButton';
 import styles from './page.module.css';
 
-const images = [
-  { src: '/assets/onboarding-1.png', alt: 'Sproutbook Feature 1' },
-  { src: '/assets/onboarding-2.png', alt: 'Sproutbook Feature 2' },
-  { src: '/assets/onboarding-3.png', alt: 'Sproutbook Feature 3' },
+const slideData = [
+  {
+    src: '/assets/onboarding-1.png',
+    alt: 'Sproutbook Feature 1',
+    title: <>Welcome<br />to Sproutbook</>,
+    subtitle: 'Easily capture everyday moments and turn them into shareable, lasting memories.',
+  },
+  {
+    src: '/assets/onboarding-2.png',
+    alt: 'AI generated recaps',
+    title: <>AI generated<br />shareable recaps</>,
+    subtitle: 'Automatically turn your journal entries into weekly and monthly recaps to share with family.',
+  },
+  {
+    src: '/assets/onboarding-3.png',
+    alt: 'Search for memories',
+    title: <>Easily search for<br />important memories</>,
+    subtitle: 'Easily capture everyday moments and turn them into shareable, lasting memories.',
+  },
 ];
 
 export default function OnboardingPage() {
@@ -16,7 +31,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
+      setCurrentIndex((prevIndex) => (prevIndex + 1) % slideData.length);
     }, 3000); // Change image every 3 seconds
 
     return () => clearInterval(interval);
@@ -29,11 +44,11 @@ export default function OnboardingPage() {
           className={styles.slides}
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
-          {images.map((image, index) => (
+          {slideData.map((slide, index) => (
             <div className={styles.slide} key={index}>
               <Image
-                src={image.src}
-                alt={image.alt}
+                src={slide.src}
+                alt={slide.alt}
                 width={400}
                 height={800}
                 priority={index === 0}
@@ -43,7 +58,7 @@ export default function OnboardingPage() {
           ))}
         </div>
         <div className={styles.dots}>
-          {images.map((_, index) => (
+          {slideData.map((_, index) => (
             <span
               key={index}
               className={`${styles.dot} ${currentIndex === index ? styles.active : ''}`}
@@ -54,13 +69,20 @@ export default function OnboardingPage() {
       </div>
       <div className={styles.container}>
         <div className={styles.content}>
-          <h1 className={styles.title}>Welcome<br />To Sproutbook</h1>
-          <p className={styles.subtitle}>
-            Easily capture everyday moments and turn<br />them into shareable, lasting memories.
-          </p>
-          <Link href="/signup" legacyBehavior>
-            <a className={styles.button}>Get Started</a>
-          </Link>
+          <div className={styles.textContentWrapper}>
+            <div
+              className={styles.textSlides}
+              style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+            >
+              {slideData.map((slide, index) => (
+                <div className={styles.textContent} key={index}>
+                  <h1 className={styles.title}>{slide.title}</h1>
+                  <p className={styles.subtitle}>{slide.subtitle}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <PrimaryButton href="/signup">Get Started</PrimaryButton>
         </div>
       </div>
     </div>

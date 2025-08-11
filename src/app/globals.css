@@ -1,4 +1,28 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+
+body {
+  font-family: 'Poppins', sans-serif;
+}
+
+@theme {
+  --colors-primary: #2E7E78;
+  --colors-secondary: #F68B7F;
+  --colors-background: #F9F6F4;
+  --colors-accent: #FFD8CD;
+  --colors-lightPink: #FFF5F2;
+
+  --colors-black: #1F1F1F;
+  --colors-darkGrey: #2E2E2E;
+  --colors-mediumGrey: #797877;
+  --colors-lightGrey: #D2D0CF;
+  --colors-offWhite: #F1EFEE;
+  --colors-white: #F9F9F8;
+
+  --colors-error: #D32F2F;
+  --colors-success: #388E3C;
+  --colors-red: #D32F2F;
+}
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));

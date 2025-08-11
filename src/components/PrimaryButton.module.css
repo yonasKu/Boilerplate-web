@@ -1,0 +1,11 @@
+.button {
+  display: inline-block;
+  width: 100%;
+  padding: 1rem;
+  background-color: var(--colors-primary);
+  color: var(--colors-white);
+  border-radius: 9999px; /* full rounded */
+  text-align: center;
+  text-decoration: none;
+  font-weight: 600;
+}

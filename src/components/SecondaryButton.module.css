@@ -1,0 +1,21 @@
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem;
+  background-color: transparent;
+  color: var(--colors-darkGrey);
+  border: 1px solid var(--colors-lightGrey);
+  border-radius: 9999px; /* full rounded */
+  text-align: center;
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.button:hover {
+  background-color: var(--colors-lightGrey);
+}

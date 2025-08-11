@@ -8,7 +8,8 @@ import {
   GoogleAuthProvider, 
   signInWithPopup,
   signInWithRedirect,
-  getRedirectResult
+  getRedirectResult,
+  OAuthProvider
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
@@ -26,41 +27,47 @@ export const useAuth = () => {
   // Handle redirect results
   useEffect(() => {
     const handleRedirectResult = async () => {
+      console.log('Checking for redirect result...');
       try {
         const result = await getRedirectResult(auth);
+        console.log('Redirect result:', result);
+
         if (result && result.user) {
           const user = result.user;
-          
+          console.log('User found from redirect:', user.uid);
+
           try {
-            // Check if user already exists in Firestore
             const userDocRef = doc(db, 'users', user.uid);
+            console.log('Checking for user document...');
             const userDoc = await getDoc(userDocRef);
 
             if (!userDoc.exists()) {
-              // New user, create a document in Firestore
+              console.log('User document does not exist, creating new one...');
               await setDoc(userDocRef, {
+                name: user.displayName,
                 email: user.email,
-                displayName: user.displayName,
-                emailVerified: user.emailVerified,
-                createdAt: new Date(),
-                source: 'web-google',
-                subscription: {
-                  status: 'trial',
-                  trialEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-                  plan: 'trial',
-                  isActive: true,
-                },
                 onboarded: false,
                 lifestage: null,
-                children: []
+                subscription: {
+                  plan: 'trial',
+                  status: 'active',
+                  startDate: new Date(),
+                },
+                children: [],
+                createdAt: new Date(),
               });
+              console.log('User document created successfully.');
+            } else {
+              console.log('User document already exists.');
             }
           } catch (firestoreError: any) {
-            console.error('Error creating user document:', firestoreError);
+            console.error('Firestore error during redirect handling:', firestoreError);
           }
+        } else {
+          console.log('No redirect result or user found.');
         }
       } catch (error: any) {
-        console.error('Error handling redirect result:', error);
+        console.error('Error processing redirect result:', error);
       }
     };
 
@@ -93,32 +100,26 @@ export const useAuth = () => {
       }
 
       try {
-        // Check if user already exists in Firestore
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
 
         if (!userDoc.exists()) {
-          // New user, create a document in Firestore
           await setDoc(userDocRef, {
+            name: user.displayName,
             email: user.email,
-            displayName: user.displayName,
-            emailVerified: user.emailVerified,
-            createdAt: new Date(),
-            source: 'web-google',
-            subscription: {
-              status: 'trial',
-              trialEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-              plan: 'trial',
-              isActive: true,
-            },
             onboarded: false,
             lifestage: null,
-            children: []
+            subscription: {
+              plan: 'trial',
+              status: 'active',
+              startDate: new Date(),
+            },
+            children: [],
+            createdAt: new Date(),
           });
           return { isNewUser: true, user };
         }
 
-        // Existing user
         return { isNewUser: false, user };
       } catch (firestoreError: any) {
         if (firestoreError.code === 'permission-denied') {
@@ -128,24 +129,85 @@ export const useAuth = () => {
         throw firestoreError;
       }
     } catch (error: any) {
-      console.error('Error during Google sign-in:', error);
-      
-      // Handle popup issues specifically
+      // Handle popup-closed error specifically, as it's a user action, not a failure.
       if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-        // Try redirect as fallback
-        try {
-          await signInWithRedirect(auth, provider);
-          return { isNewUser: false, user: null }; // Redirect will handle the rest
-        } catch (redirectError) {
-          throw new Error('Google sign-in failed. Please try again.');
-        }
-      } else if (error.code === 'auth/unauthorized-domain') {
+        console.log('Popup closed by user, falling back to redirect.');
+        // Fallback to redirect
+        await signInWithRedirect(auth, provider);
+        // Return a promise that never resolves to prevent further state changes in the UI
+        return new Promise(() => {});
+      }
+
+      console.error('Error during Google sign-in:', error);
+
+      if (error.code === 'auth/unauthorized-domain') {
         throw new Error('This domain is not authorized for Google sign-in');
       }
-      
-      throw error;
+
+      throw new Error('Google sign-in failed. Please try again.');
     }
   };
 
-  return { user, loading, signUp, signInWithGoogle };
+  const signInWithApple = async () => {
+    const provider = new OAuthProvider('apple.com');
+    
+    try {
+      // Try popup first, fallback to redirect if it fails
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      if (!user) {
+        throw new Error('No user returned from Apple sign-in');
+      }
+
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (!userDoc.exists()) {
+          await setDoc(userDocRef, {
+            name: user.displayName,
+            email: user.email,
+            onboarded: false,
+            lifestage: null,
+            subscription: {
+              plan: 'trial',
+              status: 'active',
+              startDate: new Date(),
+            },
+            children: [],
+            createdAt: new Date(),
+          });
+          return { isNewUser: true, user };
+        }
+
+        return { isNewUser: false, user };
+      } catch (firestoreError: any) {
+        if (firestoreError.code === 'permission-denied') {
+          console.error('Firestore permission denied. Check security rules:', firestoreError);
+          throw new Error('Database permission denied. Please contact support.');
+        }
+        throw firestoreError;
+      }
+    } catch (error: any) {
+      // Handle popup-closed error specifically, as it's a user action, not a failure.
+      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+        console.log('Popup closed by user, falling back to redirect.');
+        // Fallback to redirect
+        await signInWithRedirect(auth, provider);
+        // Return a promise that never resolves to prevent further state changes in the UI
+        return new Promise(() => {});
+      }
+
+      console.error('Error during Apple sign-in:', error);
+
+      if (error.code === 'auth/unauthorized-domain') {
+        throw new Error('This domain is not authorized for Apple sign-in');
+      }
+
+      throw new Error('Apple sign-in failed. Please try again.');
+    }
+  };
+
+  return { user, loading, signUp, signInWithGoogle, signInWithApple };
 };
