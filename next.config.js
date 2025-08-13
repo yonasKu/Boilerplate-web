@@ -19,8 +19,8 @@ const nextConfig = {
   },
   experimental: {
     // Enable if you need additional security features
-    serverComponentsExternalPackages: [],
   },
+  serverExternalPackages: [],
 }
 
 module.exports = nextConfig
