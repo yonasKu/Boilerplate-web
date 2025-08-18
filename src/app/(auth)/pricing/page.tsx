@@ -27,39 +27,39 @@ export default function PricingPage() {
           </div>
 
           <div className={styles.testimonialCard}>
-            <div className={styles.stars}>
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} fill="#f59e0b" strokeWidth={0} size={20} />
-              ))}
+            <div className={styles.testimonialHeader}>
+              <div className={styles.stars}>
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} fill="#f59e0b" strokeWidth={0} size={20} />
+                ))}
+              </div>
+              <div className={styles.testimonialAuthor}>
+                <p className={styles.authorName}>Alexandra W.</p>
+                <Image
+                  src="/assets/sampleProfile.png"
+                  alt="Alexandra W."
+                  width={32}
+                  height={32}
+                  className={styles.authorImage}
+                />
+              </div>
             </div>
             <p className={styles.testimonialText}>
               “This app made it so easy to capture all the precious early memories with my baby”
             </p>
-            <div className={styles.testimonialAuthor}>
-              <p className={styles.authorName}>Alexandra W.</p>
-              <Image
-                src="/assets/sampleProfile.png"
-                alt="Alexandra W."
-                width={32}
-                height={32}
-                className={styles.authorImage}
-              />
-            </div>
           </div>
 
           <div className={styles.pricingInfo}>
             <p className={styles.price}>Get 10 days free, then just $3.99/month</p>
             <p className={styles.billingCycle}>(billed $48/year)</p>
-            <a href="#" className={styles.seeAllPlans} onClick={(e) => { e.preventDefault(); setShowPlans(!showPlans); }}>
-              {showPlans ? 'Hide plans' : 'See all plans'}
-            </a>
           </div>
 
           {showPlans && (
+            <>
             <div className={styles.planSelector}>
               <div className={`${styles.planOption} ${selectedPlan === 'annual' ? styles.selected : ''}`} onClick={() => setSelectedPlan('annual')}>
-                <span className={styles.popularBadge}>Most popular</span>
-                <div className={styles.innerPlanBox}>
+                <div className={`${styles.innerPlanBox} ${selectedPlan === 'annual' ? styles.hasBadge : ''}`}>
+                  {selectedPlan === 'annual' && <span className={styles.popularBadge}>Most popular</span>}
                   <div className={styles.radioCircle}>
                     {selectedPlan === 'annual' && <Check size={16} strokeWidth={3} />}
                   </div>
@@ -71,29 +71,42 @@ export default function PricingPage() {
                 </div>
               </div>
               <div className={`${styles.planOption} ${selectedPlan === 'monthly' ? styles.selected : ''}`} onClick={() => setSelectedPlan('monthly')}>
-                <div className={styles.radioCircle}>
-                  {selectedPlan === 'monthly' && <Check size={16} strokeWidth={3} />}
-                </div>
-                <div className={styles.planDetails}>
-                  <span className={styles.planPrice}>$5.99/month</span>
-                  <span className={styles.planBilling}>Billed monthly</span>
+                <div className={styles.innerPlanBox}>
+                  <div className={styles.radioCircle}>
+                    {selectedPlan === 'monthly' && <Check size={16} strokeWidth={3} />}
+                  </div>
+                  <div className={styles.planDetails}>
+                    <span className={styles.planPrice}>$5.99/month</span>
+                    <span className={styles.planBilling}>Billed monthly</span>
+                  </div>
                 </div>
               </div>
             </div>
+            <a href="#" className={`${styles.seeAllPlans} ${styles.hidePlansBottom}`} onClick={(e) => { e.preventDefault(); setShowPlans(false); }}>
+              Hide plans
+            </a>
+            </>
+          )}
+
+          {!showPlans && (
+            <a href="#" className={`${styles.seeAllPlans} ${styles.seePlansTop}`} onClick={(e) => { e.preventDefault(); setShowPlans(true); }}>
+              See all plans
+            </a>
           )}
 
           <div className={styles.buttonsContainer}>
             <button className={styles.paymentButton}>
               <span>Continue with</span>
-              <div className={styles.paymentIconContainer}>
+              <div className={styles.paymentMethod}>
                 <Image 
-                  src={paymentMethod === 'google' ? '/assets/Google.png' : '/assets/Apple.png'}
-                  alt={paymentMethod === 'google' ? 'Pay' : 'Pay'}
-                  layout="fill"
-                  objectFit="contain"
+                  src={paymentMethod === 'google' ? '/assets/Google.png' : '/assets/Apple_white.png'}
+                  alt={paymentMethod === 'google' ? 'Google' : 'Apple'}
+                  width={20}
+                  height={20}
+                  className={styles.paymentIcon}
                 />
+                <span>   " " Pay</span>
               </div>
-              {paymentMethod === 'google' ? <span>Pay</span> : <span>Pay</span>}
             </button>
           </div>
 
@@ -104,6 +117,7 @@ export default function PricingPage() {
             More ways to pay
           </a>
 
+          
           <div className={styles.footerLinks}>
             <p>Get 10 days free before being charged</p>
             <p>Have a promo code? <a href="#">Redeem code</a></p>

@@ -93,7 +93,7 @@ export default function SignUpPage() {
           {/* This button is hidden but allows form submission on enter */}
           <button type="submit" style={{ display: 'none' }} />
         </form>
-        <PrimaryButton onClick={handleSignUp} type="submit">
+        <PrimaryButton onClick={handleSignUp} type="submit" fullWidth>
           Continue
         </PrimaryButton>
 

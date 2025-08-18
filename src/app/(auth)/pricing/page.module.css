@@ -10,7 +10,7 @@
 
 .main {
   width: 100%;
-  max-width: 375px;
+  max-width: 400px; /* Increased width */
   padding: 24px;
 }
 
@@ -24,20 +24,17 @@
   font-size: 1.75rem;
   font-weight: 600;
   text-align: center;
-  color: var(--text-primary, #1f2937);
+  color: var(--colors-darkGrey);
 }
 
 .features {
-  background-color: var(--background-secondary, #f9fafb);
-  border-radius: 16px;
-  padding: 16px;
-  border: 1px solid var(--border-primary, #e5e7eb);
+  padding: 16px 0;
 }
 
 .featuresTitle {
-  font-weight: 600;
+  font-weight: 500;
   margin-bottom: 12px;
-  color: var(--text-primary, #374151);
+  color: var(--colors-mediumGrey);
 }
 
 .featureList {
@@ -53,45 +50,49 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--text-secondary, #4b5563);
+  color: var(--colors-darkGrey);
 }
 
 .featureIcon {
-  color: var(--primary-green, #34d399);
+  color: #2E7E78;
 }
 
 .testimonialCard {
-  background-color: var(--white, #fff);
+  background-color: var(--colors-background);
   border-radius: 16px;
-  padding: 16px;
-  border: 1px solid var(--border-primary, #e5e7eb);
+  padding: 24px;
+}
+
+.testimonialHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
 .stars {
   display: flex;
-  justify-content: center;
   gap: 4px;
-  margin-bottom: 12px;
-  color: var(--primary-yellow, #f59e0b);
+  color: var(--primary-yellow);
 }
 
 .testimonialText {
-  font-style: italic;
-  color: var(--text-secondary, #4b5563);
-  margin-bottom: 12px;
-  text-align: center;
+  font-style: normal;
+  color: var(--colors-darkGrey);
+  text-align: left;
+  font-size: 0.7rem; /* Decreased font size */
 }
 
 .testimonialAuthor {
   display: flex;
-  justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .authorName {
   font-weight: 600;
-  color: var(--text-primary, #374151);
+  color: var(--colors-darkGrey);
+  font-size: 0.8rem; /* Decreased font size */
 }
 
 .authorImage {
@@ -103,21 +104,34 @@
 }
 
 .price {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-primary, #1f2937);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--colors-darkGrey);
+  margin-bottom: 4px;
 }
 
 .billingCycle {
-  color: var(--text-secondary, #6b7280);
-  margin-bottom: 8px;
+  font-size: 0.875rem;
+  color: var(--colors-mediumGrey);
+  margin-bottom: 12px;
 }
 
 .seeAllPlans {
-  color: var(--primary-blue, #3b82f6);
-  text-decoration: underline;
-  font-weight: 500;
+  display: block;
+  text-align: center;
   cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.seePlansTop {
+  color: var(--colors-primary);
+  margin-bottom: 16px;
+  text-decoration: underline;
+}
+
+.hidePlansBottom {
+  color: var(--text-secondary, #6b7280);
+  text-decoration: none;
 }
 
 .buttonsContainer {
@@ -128,18 +142,18 @@
 }
 
 .paymentButton {
-  background-color: var(--primary-green, #5D9275);
+  background-color: var(--colors-primary);
   color: var(--white, #fff);
   border: none;
   border-radius: 9999px;
   padding: 14px 24px;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 600; /* Bold text */
   cursor: pointer;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 8px; /* Increased space */
   width: 100%;
   transition: opacity 0.2s;
 }
@@ -154,6 +168,17 @@
   height: 20px;
 }
 
+.paymentMethod {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.paymentMethod span {
+  margin-right: 4px;
+}
+
+
 .moreWaysToPay {
   color: var(--text-secondary, #6b7280);
   text-align: center;
@@ -165,47 +190,59 @@
 }
 
 .footerLinks {
-  text-align: center;
-  font-size: 0.875rem;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
+  margin-top: 24px;
+  font-size: 0.875rem;
+}
+
+.footerLinks p:first-child {
+  color: var(--colors-secondary);
+}
+
+.footerLinks p:last-child {
   color: var(--text-secondary, #6b7280);
 }
 
 .footerLinks a {
-  color: var(--primary-blue, #3b82f6);
+  color: var(--text-secondary, #6b7280);
   text-decoration: underline;
 }
 
 .planSelector {
-  border: 1px solid var(--border-primary, #e5e7eb);
+  border: 1px solid var(--colors-primary);
   border-radius: 16px;
-  margin-bottom: 24px;
-  overflow: hidden;
+  padding: 16px;
+  margin-bottom: 16px;
 }
 
 .planOption {
-  position: relative;
-  padding: 16px;
   cursor: pointer;
 }
 
-.planOption:first-child {
-  border-bottom: 1px solid var(--border-primary, #e5e7eb);
-}
+
 
 .innerPlanBox {
-  border: 2px solid transparent;
+  position: relative; /* Anchor for the badge */
+  border: 1px solid var(--border-primary, #e5e7eb);
   border-radius: 12px;
   padding: 16px;
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
 }
 
 .planOption.selected .innerPlanBox {
-  border-color: var(--primary-green, #5D9275);
+  border-color: var(--colors-primary);
+}
+
+
+.planOption.selected .innerPlanBox.hasBadge {
+  padding-top: 28px; /* Add padding to make space for the badge */
 }
 
 .radioCircle {
@@ -216,14 +253,14 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  color: var(--primary-green, #5D9275);
+  color: var(--colors-primary);
   flex-shrink: 0;
 }
 
 .planOption.selected .radioCircle {
-  border-color: var(--primary-green, #5D9275);
-  background-color: var(--primary-green, #5D9275);
-  color: var(--white, #fff);
+  border-color: var(--colors-primary);
+  background-color: var(--colors-primary);
+  color: var(--colors-white);
 }
 
 .planDetails {
@@ -236,7 +273,7 @@
 
 .planPrice {
   font-weight: 600;
-  color: var(--text-primary, #1f2937);
+  color: var(--colors-darkGrey);
 }
 
 .planBilling {
@@ -247,20 +284,21 @@
 .popularBadge {
   position: absolute;
   top: 0;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: var(--primary-green, #5D9275);
-  color: var(--white, #fff);
-  padding: 6px 16px;
-  border-radius: 16px;
-  font-size: 0.9rem;
+  left: 20px;
+  transform: translateY(-50%);
+  background-color: var(--colors-primary);
+  color: var(--colors-white);
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
+  z-index: 1;
 }
 
 .saveBadge {
-  background-color: var(--primary-red-light, #fee2e2);
-  color: var(--primary-red, #ef4444);
+  background-color: var(--colors-accent);
+  color: var(--colors-secondary);
   padding: 4px 12px;
   border-radius: 8px;
   font-size: 0.85rem;
@@ -269,7 +307,7 @@
 }
 
 .subscribeButton {
-  background-color: var(--primary-green, #5D9275);
+  background-color: var(--colors-primary);
   color: var(--white, #fff);
   width: 100%;
   padding: 16px;

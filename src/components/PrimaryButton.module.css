@@ -1,6 +1,7 @@
 .button {
   display: inline-block;
   width: 100%;
+  max-width: 320px;
   padding: 1rem;
   background-color: var(--colors-primary);
   color: var(--colors-white);
@@ -8,4 +9,8 @@
   text-align: center;
   text-decoration: none;
   font-weight: 600;
+}
+
+.fullWidth {
+  max-width: 100%;
 }
