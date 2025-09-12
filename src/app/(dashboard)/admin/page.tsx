@@ -11,28 +11,97 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { Users, CreditCard, DollarSign, Activity } from 'lucide-react';
-
-// Demo data
-const userGrowthData = [
-  { name: 'Jan', users: 400 },
-  { name: 'Feb', users: 300 },
-  { name: 'Mar', users: 500 },
-  { name: 'Apr', users: 700 },
-  { name: 'May', users: 600 },
-  { name: 'Jun', users: 800 },
-];
-
-const recentUsers = [
-  { id: 1, name: 'Olivia Martin', email: 'olivia.martin@email.com', plan: 'Premium', date: '2023-08-12' },
-  { id: 2, name: 'Jackson Lee', email: 'jackson.lee@email.com', plan: 'Free', date: '2023-08-12' },
-  { id: 3, name: 'Isabella Nguyen', email: 'isabella.nguyen@email.com', plan: 'Premium', date: '2023-08-11' },
-  { id: 4, name: 'William Kim', email: 'will@email.com', plan: 'Trial', date: '2023-08-11' },
-  { id: 5, name: 'Sofia Davis', email: 'sofia.davis@email.com', plan: 'Premium', date: '2023-08-10' },
-];
+import { useEffect, useState } from 'react';
+import { collection, getCountFromServer, limit, onSnapshot, orderBy, query, Timestamp, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 
 export default function AdminDashboardPage() {
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+  const [activeSubs, setActiveSubs] = useState<number | null>(null);
+  const [dau, setDau] = useState<number | null>(null);
+
+  const [growthData, setGrowthData] = useState<{ name: string; users: number }[]>([]);
+  const [recentUsers, setRecentUsers] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    plan: string;
+  }[]>([]);
+
+  // Growth chart (last 6 days signups)
+  useEffect(() => {
+    const now = new Date();
+    const from = new Date(now);
+    from.setDate(now.getDate() - 5);
+    from.setHours(0, 0, 0, 0);
+    const qUsers = query(
+      collection(db, 'users'),
+      where('createdAt', '>=', Timestamp.fromDate(from)),
+      orderBy('createdAt', 'asc')
+    );
+    const unsub = onSnapshot(qUsers, (snap) => {
+      const byDay = new Map<string, number>();
+      for (let i = 0; i < 6; i++) {
+        const d = new Date(from);
+        d.setDate(from.getDate() + i);
+        const key = d.toISOString().slice(5, 10); // MM-DD
+        byDay.set(key, 0);
+      }
+      snap.forEach((doc) => {
+        const ts = (doc.data() as any)?.createdAt as Timestamp | undefined;
+        if (!ts) return;
+        const key = ts.toDate().toISOString().slice(5, 10);
+        if (byDay.has(key)) byDay.set(key, (byDay.get(key) || 0) + 1);
+      });
+      const arr = Array.from(byDay.entries()).map(([date, users]) => ({ name: date, users }));
+      setGrowthData(arr);
+    });
+    return () => unsub();
+  }, []);
+
+  // KPIs
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const usersColl = collection(db, 'users');
+        const total = await getCountFromServer(usersColl);
+        setTotalUsers(total.data().count);
+
+        const active = await getCountFromServer(query(usersColl, where('subscription.status', '==', 'active')));
+        setActiveSubs(active.data().count);
+
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const dauSnap = await getCountFromServer(query(usersColl, where('lastActiveAt', '>=', Timestamp.fromDate(startOfDay))));
+        setDau(dauSnap.data().count);
+      } catch (e) {
+        console.error('Failed to load dashboard KPIs', e);
+      }
+    };
+    run();
+  }, []);
+
+  // Recent signups (live)
+  useEffect(() => {
+    const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(5));
+    const unsub = onSnapshot(q, (snap) => {
+      const rows = snap.docs.map((d) => {
+        const data = d.data() as any;
+        const plan = data?.subscription?.plan ?? (data?.subscription?.status === 'active' ? 'Premium' : 'Free');
+        return {
+          id: d.id,
+          name: data?.name || data?.displayName || 'Unknown',
+          email: data?.email || '—',
+          plan: plan || '—',
+        };
+      });
+      setRecentUsers(rows);
+    });
+    return () => unsub();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -47,8 +116,8 @@ export default function AdminDashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,248</div>
-            <p className="text-xs text-muted-foreground">+20.1% from last month</p>
+            <div className="text-2xl font-bold">{totalUsers ?? '—'}</div>
+            <p className="text-xs text-muted-foreground">Live</p>
           </CardContent>
         </Card>
         <Card>
@@ -57,8 +126,8 @@ export default function AdminDashboardPage() {
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+834</div>
-            <p className="text-xs text-muted-foreground">+180.1% from last month</p>
+            <div className="text-2xl font-bold">{activeSubs ?? '—'}</div>
+            <p className="text-xs text-muted-foreground">Users with active plan</p>
           </CardContent>
         </Card>
         <Card>
@@ -67,8 +136,8 @@ export default function AdminDashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$12,480</div>
-            <p className="text-xs text-muted-foreground">+19% from last month</p>
+            <div className="text-2xl font-bold">—</div>
+            <p className="text-xs text-muted-foreground">Coming from billing backend</p>
           </CardContent>
         </Card>
         <Card>
@@ -77,8 +146,8 @@ export default function AdminDashboardPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+573</div>
-            <p className="text-xs text-muted-foreground">+201 since last hour</p>
+            <div className="text-2xl font-bold">{dau ?? '—'}</div>
+            <p className="text-xs text-muted-foreground">Active today</p>
           </CardContent>
         </Card>
       </div>
@@ -90,7 +159,7 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent className="pl-2">
             <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={userGrowthData}>
+              <LineChart data={growthData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />

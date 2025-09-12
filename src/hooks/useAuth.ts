@@ -5,14 +5,15 @@ import {
   createUserWithEmailAndPassword, 
   sendEmailVerification, 
   updateProfile, 
+  signInWithEmailAndPassword,
   GoogleAuthProvider, 
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   OAuthProvider
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -24,48 +25,14 @@ export const useAuth = () => {
     return unsubscribe;
   }, []);
 
-  // Handle redirect results
+  // Handle redirect results (do not create Firestore documents here)
   useEffect(() => {
     const handleRedirectResult = async () => {
       console.log('Checking for redirect result...');
       try {
         const result = await getRedirectResult(auth);
         console.log('Redirect result:', result);
-
-        if (result && result.user) {
-          const user = result.user;
-          console.log('User found from redirect:', user.uid);
-
-          try {
-            const userDocRef = doc(db, 'users', user.uid);
-            console.log('Checking for user document...');
-            const userDoc = await getDoc(userDocRef);
-
-            if (!userDoc.exists()) {
-              console.log('User document does not exist, creating new one...');
-              await setDoc(userDocRef, {
-                name: user.displayName,
-                email: user.email,
-                onboarded: false,
-                lifestage: null,
-                subscription: {
-                  plan: 'trial',
-                  status: 'active',
-                  startDate: new Date(),
-                },
-                children: [],
-                createdAt: new Date(),
-              });
-              console.log('User document created successfully.');
-            } else {
-              console.log('User document already exists.');
-            }
-          } catch (firestoreError: any) {
-            console.error('Firestore error during redirect handling:', firestoreError);
-          }
-        } else {
-          console.log('No redirect result or user found.');
-        }
+        // Intentionally no Firestore writes here. User doc is created only after email verification.
       } catch (error: any) {
         console.error('Error processing redirect result:', error);
       }
@@ -83,7 +50,12 @@ export const useAuth = () => {
     // Send verification email
     await sendEmailVerification(result.user);
     
-    // Return user without saving to Firestore yet
+    return result.user;
+  };
+
+  // Temporary email/password login for web admin
+  const signInWithEmail = async (email: string, password: string) => {
+    const result = await signInWithEmailAndPassword(auth, email, password);
     return result.user;
   };
 
@@ -99,35 +71,30 @@ export const useAuth = () => {
         throw new Error('No user returned from Google sign-in');
       }
 
+      // Google provider emails are verified by Google, safe to create user doc immediately
       try {
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
-
         if (!userDoc.exists()) {
+          const name = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
           await setDoc(userDocRef, {
-            name: user.displayName,
+            name,
             email: user.email,
             onboarded: false,
             lifestage: null,
             subscription: {
               plan: 'trial',
-              status: 'active',
+              status: 'trial',
               startDate: new Date(),
             },
             children: [],
             createdAt: new Date(),
           });
-          return { isNewUser: true, user };
         }
-
-        return { isNewUser: false, user };
-      } catch (firestoreError: any) {
-        if (firestoreError.code === 'permission-denied') {
-          console.error('Firestore permission denied. Check security rules:', firestoreError);
-          throw new Error('Database permission denied. Please contact support.');
-        }
-        throw firestoreError;
+      } catch (e) {
+        console.error('Failed to ensure user doc for Google sign-in:', e);
       }
+      return { isNewUser: undefined, user };
     } catch (error: any) {
       // Handle popup-closed error specifically, as it's a user action, not a failure.
       if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
@@ -160,35 +127,30 @@ export const useAuth = () => {
         throw new Error('No user returned from Apple sign-in');
       }
 
+      // Apple provider emails are verified by Apple (may be private relay). Create user doc immediately.
       try {
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
-
         if (!userDoc.exists()) {
+          const name = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
           await setDoc(userDocRef, {
-            name: user.displayName,
+            name,
             email: user.email,
             onboarded: false,
             lifestage: null,
             subscription: {
               plan: 'trial',
-              status: 'active',
+              status: 'trial',
               startDate: new Date(),
             },
             children: [],
             createdAt: new Date(),
           });
-          return { isNewUser: true, user };
         }
-
-        return { isNewUser: false, user };
-      } catch (firestoreError: any) {
-        if (firestoreError.code === 'permission-denied') {
-          console.error('Firestore permission denied. Check security rules:', firestoreError);
-          throw new Error('Database permission denied. Please contact support.');
-        }
-        throw firestoreError;
+      } catch (e) {
+        console.error('Failed to ensure user doc for Apple sign-in:', e);
       }
+      return { isNewUser: undefined, user };
     } catch (error: any) {
       // Handle popup-closed error specifically, as it's a user action, not a failure.
       if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
@@ -209,5 +171,5 @@ export const useAuth = () => {
     }
   };
 
-  return { user, loading, signUp, signInWithGoogle, signInWithApple };
+  return { user, loading, signUp, signInWithEmail, signInWithGoogle, signInWithApple };
 };

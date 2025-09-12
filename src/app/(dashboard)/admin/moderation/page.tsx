@@ -42,78 +42,91 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Search, MoreHorizontal } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { collection, limit, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
+import { adminModerationAction, type AdminModerationAction } from "@/lib/adminApi";
 
-// Demo reported content data
-const reportedContent = [
-  {
-    id: "report_1",
-    contentId: "content_123",
-    contentType: "post",
-    reporter: "John Doe",
-    reporterEmail: "john@example.com",
-    reportedUser: "Jane Smith",
-    reportedUserEmail: "jane@example.com",
-    reason: "Inappropriate content",
-    status: "pending",
-    reportedAt: "2025-08-12 14:30",
-    contentPreview: "This is a sample post content that was reported...",
-  },
-  {
-    id: "report_2",
-    contentId: "content_456",
-    contentType: "comment",
-    reporter: "Robert Johnson",
-    reporterEmail: "robert@example.com",
-    reportedUser: "Emily Davis",
-    reportedUserEmail: "emily@example.com",
-    reason: "Harassment",
-    status: "reviewed",
-    reportedAt: "2025-08-11 09:15",
-    contentPreview: "Harassing comment directed at another user...",
-  },
-  {
-    id: "report_3",
-    contentId: "content_789",
-    contentType: "image",
-    reporter: "Michael Wilson",
-    reporterEmail: "michael@example.com",
-    reportedUser: "Sarah Brown",
-    reportedUserEmail: "sarah@example.com",
-    reason: "Copyright infringement",
-    status: "resolved",
-    reportedAt: "2025-08-10 16:45",
-    contentPreview: "Image that may violate copyright...",
-  },
-  {
-    id: "report_4",
-    contentId: "content_101",
-    contentType: "post",
-    reporter: "Lisa Miller",
-    reporterEmail: "lisa@example.com",
-    reportedUser: "Tom Anderson",
-    reportedUserEmail: "tom@example.com",
-    reason: "Spam",
-    status: "pending",
-    reportedAt: "2025-08-12 10:20",
-    contentPreview: "Promotional post with suspicious links...",
-  },
-];
+type ReportDoc = {
+  id: string;
+  contentId?: string;
+  contentType?: string;
+  reporterName?: string;
+  reporterEmail?: string;
+  reporterUserId?: string;
+  reportedUserName?: string;
+  reportedUserEmail?: string;
+  reportedUserId?: string;
+  reason?: string;
+  status?: string;
+  reportedAt?: Timestamp;
+  createdAt?: Timestamp;
+  contentPreview?: string;
+};
 
 export default function ModerationPage() {
-  const [selectedReport, setSelectedReport] = useState<any>(null);
+  const [items, setItems] = useState<ReportDoc[]>([]);
+  const [search, setSearch] = useState("");
+  const [selectedReport, setSelectedReport] = useState<ReportDoc | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  
-  const handleAction = (action: string, reportId: string) => {
-    // In a real app, this would call an API to update the report status
-    console.log(`Performing action "${action}" on report ${reportId}`);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = query(collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(100));
+    const unsub = onSnapshot(q, (snap) => {
+      const rows: ReportDoc[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+      setItems(rows);
+    });
+    return () => unsub();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((r) => {
+      const contentId = (r.contentId || '').toLowerCase();
+      const reporter = (r.reporterName || (r as any).reporter || '').toLowerCase();
+      const reporterEmail = (r.reporterEmail || '').toLowerCase();
+      const reportedUser = (r.reportedUserName || (r as any).reportedUser || '').toLowerCase();
+      const reportedEmail = (r.reportedUserEmail || '').toLowerCase();
+      const reason = (r.reason || '').toLowerCase();
+      return (
+        contentId.includes(term) ||
+        reporter.includes(term) ||
+        reporterEmail.includes(term) ||
+        reportedUser.includes(term) ||
+        reportedEmail.includes(term) ||
+        reason.includes(term)
+      );
+    });
+  }, [items, search]);
+
+  const handleAction = async (action: AdminModerationAction, reportId: string) => {
+    if (pendingAction) return;
+    const key = `${action}:${reportId}`;
+    setPendingAction(key);
+    try {
+      await adminModerationAction({ reportId, action });
+      // Firestore listener will reflect updates; provide minimal feedback
+      if (typeof window !== 'undefined') {
+        alert(`Action \"${action}\" applied to report ${reportId}`);
+      }
+    } catch (e: any) {
+      const msg = e?.message || 'Action failed';
+      if (typeof window !== 'undefined') {
+        alert(msg);
+      }
+      console.error('adminModerationAction error', e);
+    } finally {
+      setPendingAction(null);
+    }
   };
-  
-  const openReportDetails = (report: any) => {
+
+  const openReportDetails = (report: ReportDoc) => {
     setSelectedReport(report);
     setIsViewDialogOpen(true);
   };
-  
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -133,6 +146,8 @@ export default function ModerationPage() {
               <Input
                 placeholder="Search reports..."
                 className="pl-8"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
           </div>
@@ -151,31 +166,41 @@ export default function ModerationPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {reportedContent.map((report) => (
+              {filtered.map((report) => {
+                const contentId = report.contentId || '—';
+                const contentType = report.contentType || 'post';
+                const reporter = report.reporterName || (report as any).reporter || '—';
+                const reporterEmail = report.reporterEmail || '—';
+                const reportedUser = report.reportedUserName || (report as any).reportedUser || '—';
+                const reportedUserEmail = report.reportedUserEmail || '—';
+                const reason = report.reason || '—';
+                const status = report.status || 'pending';
+                const reportedAt = (report.reportedAt || report.createdAt) ? (report.reportedAt || report.createdAt)!.toDate().toISOString().replace('T', ' ').slice(0,16) : '—';
+                return (
                 <TableRow key={report.id}>
-                  <TableCell className="font-medium">{report.contentId}</TableCell>
-                  <TableCell>{report.contentType}</TableCell>
+                  <TableCell className="font-medium">{contentId}</TableCell>
+                  <TableCell>{contentType}</TableCell>
                   <TableCell>
-                    <div>{report.reporter}</div>
-                    <div className="text-sm text-muted-foreground">{report.reporterEmail}</div>
+                    <div>{reporter}</div>
+                    <div className="text-sm text-muted-foreground">{reporterEmail}</div>
                   </TableCell>
                   <TableCell>
-                    <div>{report.reportedUser}</div>
-                    <div className="text-sm text-muted-foreground">{report.reportedUserEmail}</div>
+                    <div>{reportedUser}</div>
+                    <div className="text-sm text-muted-foreground">{reportedUserEmail}</div>
                   </TableCell>
-                  <TableCell>{report.reason}</TableCell>
+                  <TableCell>{reason}</TableCell>
                   <TableCell>
                     <Badge 
                       variant={
-                        report.status === "pending" ? "default" : 
-                        report.status === "reviewed" ? "secondary" : 
+                        status === "pending" ? "default" : 
+                        status === "reviewed" ? "secondary" : 
                         "outline"
                       }
                     >
-                      {report.status}
+                      {status}
                     </Badge>
                   </TableCell>
-                  <TableCell>{report.reportedAt}</TableCell>
+                  <TableCell>{reportedAt}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -203,7 +228,7 @@ export default function ModerationPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Remove Content</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to remove this {report.contentType}? This action cannot be undone.
+                                Are you sure you want to remove this {contentType}? This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -231,13 +256,14 @@ export default function ModerationPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
           
           <div className="flex items-center justify-end space-x-2 py-4">
             <div className="text-sm text-muted-foreground">
-              Showing 4 of 24 reported items
+              Showing {filtered.length} of {items.length} reported items
             </div>
             <Button variant="outline" size="sm">Previous</Button>
             <Button variant="outline" size="sm">Next</Button>
@@ -257,53 +283,53 @@ export default function ModerationPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium">Content ID</label>
-                <div className="col-span-3">{selectedReport.contentId}</div>
+                <div className="col-span-3">{selectedReport.contentId || '—'}</div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium">Type</label>
-                <div className="col-span-3">{selectedReport.contentType}</div>
+                <div className="col-span-3">{selectedReport.contentType || 'post'}</div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium">Reporter</label>
                 <div className="col-span-3">
-                  <div>{selectedReport.reporter}</div>
-                  <div className="text-sm text-muted-foreground">{selectedReport.reporterEmail}</div>
+                  <div>{selectedReport.reporterName || (selectedReport as any).reporter || '—'}</div>
+                  <div className="text-sm text-muted-foreground">{selectedReport.reporterEmail || '—'}</div>
                 </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium">Reported User</label>
                 <div className="col-span-3">
-                  <div>{selectedReport.reportedUser}</div>
-                  <div className="text-sm text-muted-foreground">{selectedReport.reportedUserEmail}</div>
+                  <div>{selectedReport.reportedUserName || (selectedReport as any).reportedUser || '—'}</div>
+                  <div className="text-sm text-muted-foreground">{selectedReport.reportedUserEmail || '—'}</div>
                 </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium">Reason</label>
-                <div className="col-span-3">{selectedReport.reason}</div>
+                <div className="col-span-3">{selectedReport.reason || '—'}</div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium">Status</label>
                 <div className="col-span-3">
                   <Badge 
                     variant={
-                      selectedReport.status === "pending" ? "default" : 
-                      selectedReport.status === "reviewed" ? "secondary" : 
+                      (selectedReport.status || 'pending') === "pending" ? "default" : 
+                      (selectedReport.status || 'pending') === "reviewed" ? "secondary" : 
                       "outline"
                     }
                   >
-                    {selectedReport.status}
+                    {selectedReport.status || 'pending'}
                   </Badge>
                 </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium">Reported At</label>
-                <div className="col-span-3">{selectedReport.reportedAt}</div>
+                <div className="col-span-3">{(selectedReport.reportedAt || selectedReport.createdAt) ? (selectedReport.reportedAt || selectedReport.createdAt)!.toDate().toISOString().replace('T', ' ').slice(0,16) : '—'}</div>
               </div>
               <div className="grid grid-cols-4 gap-4">
                 <label className="text-right text-sm font-medium">Content Preview</label>
                 <Textarea
                   className="col-span-3"
-                  value={selectedReport.contentPreview}
+                  value={selectedReport.contentPreview || ''}
                   readOnly
                 />
               </div>

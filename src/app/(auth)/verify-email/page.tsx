@@ -5,7 +5,7 @@ import { Check, Mail, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase/config';
 import { sendEmailVerification } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import styles from './page.module.css';
 
 export default function VerifyEmailPage() {
@@ -20,28 +20,34 @@ export default function VerifyEmailPage() {
       if (user) {
         await user.reload();
         if (user.emailVerified) {
-          // Save user to Firestore after email verification
+          // Ensure Firestore user doc exists with schema required by firestore.rules
           try {
-            await setDoc(doc(db, 'users', user.uid), {
-              email: user.email,
-              displayName: user.displayName,
-              emailVerified: true,
-              createdAt: new Date(),
-              source: user.providerData[0]?.providerId === 'google.com' ? 'web-google' : 'web',
-              subscription: {
-                status: 'trial',
-                trialEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-                plan: 'trial',
-                isActive: true
-              }
-            });
+            const userRef = doc(db, 'users', user.uid);
+            const snap = await getDoc(userRef);
+            if (!snap.exists()) {
+              const name = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
+              await setDoc(userRef, {
+                name,
+                email: user.email,
+                onboarded: false,
+                lifestage: null,
+                subscription: {
+                  plan: 'trial',
+                  status: 'trial',
+                  startDate: new Date(),
+                },
+                children: [],
+                createdAt: new Date(),
+              });
+            }
+            setVerified(true);
+            setTimeout(() => {
+              router.push('/pricing');
+            }, 1500);
           } catch (error) {
             console.error('Error saving user to Firestore:', error);
+            setMessage('You are verified, but we could not complete account setup. Please reload or try again.');
           }
-          setVerified(true);
-          setTimeout(() => {
-            router.push('/pricing');
-          }, 2000);
         }
       }
       setLoading(false);

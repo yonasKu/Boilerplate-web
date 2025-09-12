@@ -14,34 +14,73 @@ export default function SignUpPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
   const { signUp, signInWithGoogle, signInWithApple } = useAuth();
   const router = useRouter();
 
   const handleSignUp = async (e: FormEvent) => {
     e.preventDefault();
     try {
+      setError('');
+      setLoading(true);
       await signUp(email, password, name);
-      router.push('/home');
+      router.push('/verify-email');
     } catch (error) {
-      console.error('Sign up failed:', error);
+      // Map Firebase error codes to friendly messages
+      const code = (error as any)?.code as string | undefined;
+      let msg = 'Sign up failed. Please try again.';
+      if (code === 'auth/email-already-in-use') msg = 'This email is already in use. Try logging in or use a different email.';
+      else if (code === 'auth/invalid-email') msg = 'Please enter a valid email address.';
+      else if (code === 'auth/weak-password') msg = 'Password is too weak. Please use at least 6 characters.';
+      else if (code === 'auth/network-request-failed') msg = 'Network error. Check your connection and try again.';
+      setError(msg);
+    }
+    finally {
+      setLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
     try {
+      setError('');
+      setLoading(true);
       await signInWithGoogle();
-      router.push('/home');
+      router.push('/pricing');
     } catch (error) {
-      console.error('Google sign in failed:', error);
+      const code = (error as any)?.code as string | undefined;
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        // Silent: user dismissed popup
+        return;
+      }
+      let msg = 'Google sign in failed. Please try again.';
+      if (code === 'auth/unauthorized-domain') msg = 'This domain is not authorized for Google sign-in.';
+      else if (code === 'auth/network-request-failed') msg = 'Network error. Check your connection and try again.';
+      setError(msg);
+    }
+    finally {
+      setLoading(false);
     }
   };
 
   const handleAppleSignIn = async () => {
     try {
+      setError('');
+      setLoading(true);
       await signInWithApple();
-      router.push('/home');
+      router.push('/pricing');
     } catch (error) {
-      console.error('Apple sign in failed:', error);
+      const code = (error as any)?.code as string | undefined;
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        return;
+      }
+      let msg = 'Apple sign in failed. Please try again.';
+      if (code === 'auth/unauthorized-domain') msg = 'This domain is not authorized for Apple sign-in.';
+      else if (code === 'auth/network-request-failed') msg = 'Network error. Check your connection and try again.';
+      setError(msg);
+    }
+    finally {
+      setLoading(false);
     }
   };
 
@@ -93,8 +132,13 @@ export default function SignUpPage() {
           {/* This button is hidden but allows form submission on enter */}
           <button type="submit" style={{ display: 'none' }} />
         </form>
+        {error && (
+          <div style={{ color: '#b91c1c', background: '#fee2e2', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+            {error}
+          </div>
+        )}
         <PrimaryButton onClick={handleSignUp} type="submit" fullWidth>
-          Continue
+          {loading ? 'Please wait…' : 'Continue'}
         </PrimaryButton>
 
         <div className={styles.divider}>or</div>

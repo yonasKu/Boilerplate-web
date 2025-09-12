@@ -32,62 +32,46 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { MoreHorizontal, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { collection, onSnapshot, orderBy, query, limit, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
 
-// Demo user data
-const users = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "john@example.com",
-    status: "active",
-    role: "user",
-    subscription: "premium",
-    lastActive: "2025-08-12",
-    signUpDate: "2025-07-15",
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    email: "jane@example.com",
-    status: "inactive",
-    role: "user",
-    subscription: "free",
-    lastActive: "2025-08-10",
-    signUpDate: "2025-07-20",
-  },
-  {
-    id: "3",
-    name: "Robert Johnson",
-    email: "robert@example.com",
-    status: "active",
-    role: "admin",
-    subscription: "premium",
-    lastActive: "2025-08-12",
-    signUpDate: "2025-07-10",
-  },
-  {
-    id: "4",
-    name: "Emily Davis",
-    email: "emily@example.com",
-    status: "pending",
-    role: "user",
-    subscription: "trial",
-    lastActive: "2025-08-11",
-    signUpDate: "2025-08-11",
-  },
-  {
-    id: "5",
-    name: "Michael Wilson",
-    email: "michael@example.com",
-    status: "suspended",
-    role: "user",
-    subscription: "premium",
-    lastActive: "2025-08-05",
-    signUpDate: "2025-07-01",
-  },
-];
+type UserDoc = {
+  id: string;
+  name?: string;
+  displayName?: string;
+  email?: string;
+  role?: string;
+  isAdmin?: boolean;
+  status?: string;
+  subscription?: { plan?: string } | null;
+  lastActiveAt?: Timestamp;
+  createdAt?: Timestamp;
+};
 
 export default function UserManagementPage() {
+  const [items, setItems] = useState<UserDoc[]>([]);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(50));
+    const unsub = onSnapshot(q, (snap) => {
+      const rows: UserDoc[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+      setItems(rows);
+    });
+    return () => unsub();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((u) => {
+      const name = (u.name || u.displayName || '').toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      return name.includes(term) || email.includes(term);
+    });
+  }, [items, search]);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -107,6 +91,8 @@ export default function UserManagementPage() {
               <Input
                 placeholder="Search users..."
                 className="pl-8"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
           </div>
@@ -125,88 +111,97 @@ export default function UserManagementPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={
-                        user.status === "active" ? "default" : 
-                        user.status === "inactive" ? "secondary" : 
-                        user.status === "pending" ? "outline" : 
-                        "destructive"
-                      }
-                    >
-                      {user.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{user.role}</TableCell>
-                  <TableCell>{user.subscription}</TableCell>
-                  <TableCell>{user.lastActive}</TableCell>
-                  <TableCell>{user.signUpDate}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>View user details</DropdownMenuItem>
-                        <DropdownMenuItem>Edit user</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {user.status === "active" ? (
+              {filtered.map((user) => {
+                const name = user.name || user.displayName || '—';
+                const email = user.email || '—';
+                const role = user.isAdmin || user.role === 'admin' ? 'admin' : (user.role || 'user');
+                const status = user.status || 'active';
+                const plan = user.subscription?.plan || '—';
+                const lastActive = user.lastActiveAt ? user.lastActiveAt.toDate().toISOString().slice(0,10) : '—';
+                const created = user.createdAt ? user.createdAt.toDate().toISOString().slice(0,10) : '—';
+                return (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">{name}</TableCell>
+                    <TableCell>{email}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          status === 'active' ? 'default' :
+                          status === 'inactive' ? 'secondary' :
+                          status === 'pending' ? 'outline' :
+                          'destructive'
+                        }
+                      >
+                        {status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{role}</TableCell>
+                    <TableCell>{plan}</TableCell>
+                    <TableCell>{lastActive}</TableCell>
+                    <TableCell>{created}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem>View user details</DropdownMenuItem>
+                          <DropdownMenuItem>Edit user</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {status === 'active' ? (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem className="text-destructive">Disable user</DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will disable {name}'s account. They will not be able to access the application until re-enabled.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction>Disable User</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          ) : (
+                            <DropdownMenuItem>Enable user</DropdownMenuItem>
+                          )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <DropdownMenuItem className="text-destructive">Disable user</DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive">Delete user</DropdownMenuItem>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  This will disable {user.name}'s account. They will not be able to access the application until re-enabled.
+                                  This action cannot be undone. This will permanently delete {name}'s account and remove all associated data.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction>Disable User</AlertDialogAction>
+                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90">Delete User</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
-                        ) : (
-                          <DropdownMenuItem>Enable user</DropdownMenuItem>
-                        )}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <DropdownMenuItem className="text-destructive">Delete user</DropdownMenuItem>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete {user.name}'s account and remove all associated data.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction className="bg-destructive hover:bg-destructive/90">Delete User</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
           
           <div className="flex items-center justify-end space-x-2 py-4">
             <div className="text-sm text-muted-foreground">
-              Showing 5 of 1248 users
+              Showing {filtered.length} users
             </div>
             <Button variant="outline" size="sm">Previous</Button>
             <Button variant="outline" size="sm">Next</Button>

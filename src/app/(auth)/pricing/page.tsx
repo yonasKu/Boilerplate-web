@@ -1,15 +1,82 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Check, Star } from 'lucide-react';
 import Image from 'next/image';
 import styles from './page.module.css';
+import { startCheckout, fetchStripePrices, StripePublicPrice } from '@/lib/stripeClient';
 
 
 export default function PricingPage() {
   const [showPlans, setShowPlans] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('annual');
-  const [paymentMethod, setPaymentMethod] = useState<'google' | 'apple'>('google');
+  // const [paymentMethod, setPaymentMethod] = useState<'google' | 'apple'>('google');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  // Dynamic Stripe prices
+  const monthlyId = process.env.NEXT_PUBLIC_STRIPE_MONTHLY_PRICE_ID as string | undefined;
+  const yearlyId = process.env.NEXT_PUBLIC_STRIPE_YEARLY_PRICE_ID as string | undefined;
+  const [prices, setPrices] = useState<Record<string, StripePublicPrice | null> | null>(null);
+  const [priceError, setPriceError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      setPriceError(null);
+      try {
+        const ids = [monthlyId, yearlyId].filter(Boolean) as string[];
+        if (ids.length === 0) return; // no configured IDs, keep fallbacks
+        const p = await fetchStripePrices(ids);
+        if (mounted) setPrices(p);
+      } catch (e: any) {
+        if (mounted) setPriceError(e?.message || 'Unable to load pricing');
+      }
+    }
+    load();
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function formatMoney(currency: string | undefined, amountMinor: number | undefined) {
+    if (!currency || typeof amountMinor !== 'number') return null;
+    try {
+      return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amountMinor / 100);
+    } catch {
+      return `$${(amountMinor / 100).toFixed(2)}`;
+    }
+  }
+
+  const monthlyPrice = prices && monthlyId ? prices[monthlyId] : null;
+  const yearlyPrice = prices && yearlyId ? prices[yearlyId] : null;
+
+  const displayMonthly = useMemo(() => {
+    return formatMoney(monthlyPrice?.currency, monthlyPrice?.unit_amount) || '$6.99';
+  }, [monthlyPrice]);
+
+  const displayYearlyTotal = useMemo(() => {
+    return formatMoney(yearlyPrice?.currency, yearlyPrice?.unit_amount) || '$59.99';
+  }, [yearlyPrice]);
+
+  const displayYearlyEffectiveMonthly = useMemo(() => {
+    if (yearlyPrice?.unit_amount && yearlyPrice?.currency) {
+      const perMonthMinor = Math.round(yearlyPrice.unit_amount / 12);
+      return formatMoney(yearlyPrice.currency, perMonthMinor) || '$4.99';
+    }
+    return '$4.99';
+  }, [yearlyPrice]);
+
+  const savePercent = useMemo(() => {
+    if (yearlyPrice?.unit_amount && monthlyPrice?.unit_amount) {
+      const effMonthly = yearlyPrice.unit_amount / 12;
+      const pct = 1 - effMonthly / monthlyPrice.unit_amount;
+      const rounded = Math.max(0, Math.round(pct * 100));
+      if (isFinite(rounded) && rounded > 0) return `Save ${rounded}%`;
+    }
+    return 'Save 29%';
+  }, [yearlyPrice, monthlyPrice]);
 
   return (
     <div className={styles.pageWrapper}>
@@ -50,8 +117,8 @@ export default function PricingPage() {
           </div>
 
           <div className={styles.pricingInfo}>
-            <p className={styles.price}>Get 10 days free, then just $3.99/month</p>
-            <p className={styles.billingCycle}>(billed $48/year)</p>
+            <p className={styles.price}>Get 10 days free, then just {displayYearlyEffectiveMonthly}/month</p>
+            <p className={styles.billingCycle}>(billed {displayYearlyTotal}/year)</p>
           </div>
 
           {showPlans && (
@@ -64,10 +131,10 @@ export default function PricingPage() {
                     {selectedPlan === 'annual' && <Check size={16} strokeWidth={3} />}
                   </div>
                   <div className={styles.planDetails}>
-                    <span className={styles.planPrice}>$3.99/month</span>
-                    <span className={styles.planBilling}>Billed at $48/year</span>
+                    <span className={styles.planPrice}>{displayYearlyEffectiveMonthly}/month</span>
+                    <span className={styles.planBilling}>Billed at {displayYearlyTotal}/year</span>
                   </div>
-                  <span className={styles.saveBadge}>Save 33%</span>
+                  <span className={styles.saveBadge}>{savePercent}</span>
                 </div>
               </div>
               <div className={`${styles.planOption} ${selectedPlan === 'monthly' ? styles.selected : ''}`} onClick={() => setSelectedPlan('monthly')}>
@@ -76,7 +143,7 @@ export default function PricingPage() {
                     {selectedPlan === 'monthly' && <Check size={16} strokeWidth={3} />}
                   </div>
                   <div className={styles.planDetails}>
-                    <span className={styles.planPrice}>$5.99/month</span>
+                    <span className={styles.planPrice}>{displayMonthly}/month</span>
                     <span className={styles.planBilling}>Billed monthly</span>
                   </div>
                 </div>
@@ -95,27 +162,42 @@ export default function PricingPage() {
           )}
 
           <div className={styles.buttonsContainer}>
-            <button className={styles.paymentButton}>
-              <span>Continue with</span>
-              <div className={styles.paymentMethod}>
-                <Image 
-                  src={paymentMethod === 'google' ? '/assets/Google.png' : '/assets/Apple_white.png'}
-                  alt={paymentMethod === 'google' ? 'Google' : 'Apple'}
-                  width={20}
-                  height={20}
-                  className={styles.paymentIcon}
-                />
-                <span>   " " Pay</span>
-              </div>
+            <button
+              className={styles.paymentButton}
+              onClick={async () => {
+                setError(null);
+                setSubmitting(true);
+                try {
+                  const yearly = process.env.NEXT_PUBLIC_STRIPE_YEARLY_PRICE_ID;
+                  const monthly = process.env.NEXT_PUBLIC_STRIPE_MONTHLY_PRICE_ID;
+                  const priceId = selectedPlan === 'annual' ? yearly : monthly;
+                  if (!priceId) throw new Error('Billing is not configured. Missing Stripe price ID.');
+                  await startCheckout(priceId);
+                } catch (e: any) {
+                  const msg = e?.message || 'Unable to start checkout';
+                  // If user is not signed in, send them to login
+                  if (/signed in/i.test(msg)) {
+                    router.push('/login');
+                  } else {
+                    setError(msg);
+                  }
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              disabled={submitting}
+            >
+              <span>{submitting ? 'Processing…' : 'Continue to Checkout'}</span>
             </button>
           </div>
 
-          <a href="#" className={styles.moreWaysToPay} onClick={(e) => {
-            e.preventDefault();
-            setPaymentMethod(paymentMethod === 'google' ? 'apple' : 'google');
-          }}>
-            More ways to pay
-          </a>
+          <p className={styles.moreWaysToPay} style={{ textAlign: 'center', marginTop: 8 }}>
+            Apple Pay / Google Pay will be offered by Stripe Checkout when supported on your device.
+          </p>
+
+          {error && (
+            <p style={{ color: '#DC2626', textAlign: 'center', marginTop: 12 }}>{error}</p>
+          )}
 
           
           <div className={styles.footerLinks}>

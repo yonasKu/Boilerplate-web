@@ -39,67 +39,47 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, MoreHorizontal } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { collection, limit, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
 
-// Demo subscription data
-const subscriptions = [
-  {
-    id: "sub_1",
-    userId: "user_123",
-    userName: "John Doe",
-    userEmail: "john@example.com",
-    plan: "Premium",
-    status: "active",
-    startDate: "2025-07-15",
-    endDate: "2025-08-15",
-    amount: "$9.99/month",
-  },
-  {
-    id: "sub_2",
-    userId: "user_456",
-    userName: "Jane Smith",
-    userEmail: "jane@example.com",
-    plan: "Free",
-    status: "active",
-    startDate: "2025-07-20",
-    endDate: "Never",
-    amount: "$0.00",
-  },
-  {
-    id: "sub_3",
-    userId: "user_789",
-    userName: "Robert Johnson",
-    userEmail: "robert@example.com",
-    plan: "Premium",
-    status: "expired",
-    startDate: "2025-07-10",
-    endDate: "2025-08-10",
-    amount: "$9.99/month",
-  },
-  {
-    id: "sub_4",
-    userId: "user_101",
-    userName: "Emily Davis",
-    userEmail: "emily@example.com",
-    plan: "Trial",
-    status: "trialing",
-    startDate: "2025-08-11",
-    endDate: "2025-08-18",
-    amount: "$0.00",
-  },
-  {
-    id: "sub_5",
-    userId: "user_202",
-    userName: "Michael Wilson",
-    userEmail: "michael@example.com",
-    plan: "Premium",
-    status: "canceled",
-    startDate: "2025-07-01",
-    endDate: "2025-08-01",
-    amount: "$9.99/month",
-  },
-];
+type UserSub = {
+  id: string;
+  name?: string;
+  displayName?: string;
+  email?: string;
+  subscription?: {
+    plan?: string;
+    status?: string;
+    startDate?: Timestamp;
+    endDate?: Timestamp | null;
+    amount?: string; // optional string if present
+  } | null;
+  createdAt?: Timestamp;
+};
 
 export default function SubscriptionManagementPage() {
+  const [items, setItems] = useState<UserSub[]>([]);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(50));
+    const unsub = onSnapshot(q, (snap) => {
+      const rows: UserSub[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+      setItems(rows);
+    });
+    return () => unsub();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((u) => {
+      const name = (u.name || u.displayName || '').toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      return name.includes(term) || email.includes(term);
+    });
+  }, [items, search]);
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -119,6 +99,8 @@ export default function SubscriptionManagementPage() {
               <Input
                 placeholder="Search subscriptions..."
                 className="pl-8"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
             
@@ -166,68 +148,77 @@ export default function SubscriptionManagementPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {subscriptions.map((subscription) => (
-                <TableRow key={subscription.id}>
-                  <TableCell className="font-medium">{subscription.userName}</TableCell>
-                  <TableCell>{subscription.userEmail}</TableCell>
-                  <TableCell>{subscription.plan}</TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={
-                        subscription.status === "active" ? "default" : 
-                        subscription.status === "trialing" ? "secondary" : 
-                        subscription.status === "expired" ? "outline" : 
-                        "destructive"
-                      }
-                    >
-                      {subscription.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{subscription.startDate}</TableCell>
-                  <TableCell>{subscription.endDate}</TableCell>
-                  <TableCell>{subscription.amount}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>View subscription details</DropdownMenuItem>
-                        <DropdownMenuItem>Extend subscription</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {subscription.status === "active" ? (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem className="text-destructive">Cancel subscription</DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Cancel Subscription</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to cancel {subscription.userName}'s {subscription.plan} subscription? 
-                                  This will end their access to premium features at the end of their billing period.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90">Confirm Cancellation</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        ) : (
-                          <DropdownMenuItem>Reactivate subscription</DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem>Upgrade plan</DropdownMenuItem>
-                        <DropdownMenuItem>Downgrade plan</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filtered.map((u) => {
+                const name = u.name || u.displayName || '—';
+                const email = u.email || '—';
+                const plan = u.subscription?.plan || 'Free';
+                const status = u.subscription?.status || 'inactive';
+                const startDate = u.subscription?.startDate ? u.subscription.startDate.toDate().toISOString().slice(0,10) : '—';
+                const endDate = u.subscription?.endDate ? u.subscription.endDate.toDate().toISOString().slice(0,10) : 'Never';
+                const amount = u.subscription?.amount || (plan === 'Premium' ? '$9.99/month' : '$0.00');
+                return (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">{name}</TableCell>
+                    <TableCell>{email}</TableCell>
+                    <TableCell>{plan}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant={
+                          status === 'active' ? 'default' : 
+                          status === 'trial' || status === 'trialing' ? 'secondary' : 
+                          status === 'expired' ? 'outline' : 
+                          'destructive'
+                        }
+                      >
+                        {status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{startDate}</TableCell>
+                    <TableCell>{endDate}</TableCell>
+                    <TableCell>{amount}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem>View subscription details</DropdownMenuItem>
+                          <DropdownMenuItem>Extend subscription</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {status === 'active' ? (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem className="text-destructive">Cancel subscription</DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Cancel Subscription</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to cancel {name}'s {plan} subscription? 
+                                    This will end their access to premium features at the end of their billing period.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction className="bg-destructive hover:bg-destructive/90">Confirm Cancellation</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          ) : (
+                            <DropdownMenuItem>Reactivate subscription</DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem>Upgrade plan</DropdownMenuItem>
+                          <DropdownMenuItem>Downgrade plan</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
           
