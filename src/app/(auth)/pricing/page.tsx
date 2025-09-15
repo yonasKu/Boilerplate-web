@@ -6,6 +6,9 @@ import { Check, Star } from 'lucide-react';
 import Image from 'next/image';
 import styles from './page.module.css';
 import { startCheckout, fetchStripePrices, StripePublicPrice } from '@/lib/stripeClient';
+import PromoCodeModal from '@/components/ui/PromoCodeModal';
+import { auth } from '@/lib/firebase/config';
+import { onAuthStateChanged, type User } from 'firebase/auth';
 
 
 export default function PricingPage() {
@@ -14,6 +17,9 @@ export default function PricingPage() {
   // const [paymentMethod, setPaymentMethod] = useState<'google' | 'apple'>('google');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPromo, setShowPromo] = useState(false);
+  const [applied, setApplied] = useState<{ code: string; compUntil?: string; compDays?: number } | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const router = useRouter();
 
   // Dynamic Stripe prices
@@ -38,6 +44,12 @@ export default function PricingPage() {
     load();
     return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Observe auth state for gating the checkout CTA
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setCurrentUser(u));
+    return () => unsub();
   }, []);
 
   function formatMoney(currency: string | undefined, amountMinor: number | undefined) {
@@ -121,6 +133,12 @@ export default function PricingPage() {
             <p className={styles.billingCycle}>(billed {displayYearlyTotal}/year)</p>
           </div>
 
+          {applied && (
+            <div style={{ marginTop: 12, padding: 12, background: '#E6F4EA', border: '1px solid #C7E8D1', borderRadius: 8, textAlign: 'center' }}>
+              Code {applied.code} applied{applied.compUntil ? ` – free until ${new Date(applied.compUntil).toLocaleDateString()}` : ''}
+            </div>
+          )}
+
           {showPlans && (
             <>
             <div className={styles.planSelector}>
@@ -162,33 +180,42 @@ export default function PricingPage() {
           )}
 
           <div className={styles.buttonsContainer}>
-            <button
-              className={styles.paymentButton}
-              onClick={async () => {
-                setError(null);
-                setSubmitting(true);
-                try {
-                  const yearly = process.env.NEXT_PUBLIC_STRIPE_YEARLY_PRICE_ID;
-                  const monthly = process.env.NEXT_PUBLIC_STRIPE_MONTHLY_PRICE_ID;
-                  const priceId = selectedPlan === 'annual' ? yearly : monthly;
-                  if (!priceId) throw new Error('Billing is not configured. Missing Stripe price ID.');
-                  await startCheckout(priceId);
-                } catch (e: any) {
-                  const msg = e?.message || 'Unable to start checkout';
-                  // If user is not signed in, send them to login
-                  if (/signed in/i.test(msg)) {
-                    router.push('/login');
-                  } else {
+            {currentUser ? (
+              <button
+                className={styles.paymentButton}
+                onClick={async () => {
+                  setError(null);
+                  setSubmitting(true);
+                  try {
+                    const yearly = process.env.NEXT_PUBLIC_STRIPE_YEARLY_PRICE_ID;
+                    const monthly = process.env.NEXT_PUBLIC_STRIPE_MONTHLY_PRICE_ID;
+                    const priceId = selectedPlan === 'annual' ? yearly : monthly;
+                    if (!priceId) throw new Error('Billing is not configured. Missing Stripe price ID.');
+                    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                    await startCheckout(priceId, {
+                      successUrl: origin ? `${origin}/download` : undefined,
+                      cancelUrl: origin ? `${origin}/pricing` : undefined,
+                    });
+                  } catch (e: any) {
+                    const msg = e?.message || 'Unable to start checkout';
                     setError(msg);
+                  } finally {
+                    setSubmitting(false);
                   }
-                } finally {
-                  setSubmitting(false);
-                }
-              }}
-              disabled={submitting}
-            >
-              <span>{submitting ? 'Processing…' : 'Continue to Checkout'}</span>
-            </button>
+                }}
+                disabled={submitting}
+              >
+                <span>{submitting ? 'Processing…' : 'Continue to Checkout'}</span>
+              </button>
+            ) : (
+              <button
+                className={styles.paymentButton}
+                onClick={() => router.push('/signup?next=/pricing')}
+                disabled={submitting}
+              >
+                Sign up to continue
+              </button>
+            )}
           </div>
 
           <p className={styles.moreWaysToPay} style={{ textAlign: 'center', marginTop: 8 }}>
@@ -199,10 +226,15 @@ export default function PricingPage() {
             <p style={{ color: '#DC2626', textAlign: 'center', marginTop: 12 }}>{error}</p>
           )}
 
-          
+          <PromoCodeModal
+            open={showPromo}
+            onClose={() => setShowPromo(false)}
+            onApplied={(result) => setApplied(result)}
+          />
+
           <div className={styles.footerLinks}>
             <p>Get 10 days free before being charged</p>
-            <p>Have a promo code? <a href="#">Redeem code</a></p>
+            <p>Have a promo code? <a href="#" onClick={(e) => { e.preventDefault(); setShowPromo(true); }}>Redeem code</a></p>
           </div>
         </div>
       </main>
