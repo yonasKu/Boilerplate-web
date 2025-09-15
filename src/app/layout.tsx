@@ -16,6 +16,7 @@ export const metadata: Metadata = {
   description: "Capture your baby's journey with AI-powered recaps and family sharing.",
   icons: {
     icon: [
+      { url: "/favicon.ico" },
       { url: "/assets/favicon.png", type: "image/png", sizes: "48x48" },
     ],
     shortcut: [
